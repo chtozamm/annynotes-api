@@ -21,10 +21,10 @@ func main() {
 	// TODO: improve error handling
 
 	r.HandleFunc("/{$}", homeHandler)
-	r.HandleFunc("GET /posts/{id}", getPostHandler)
-	r.HandleFunc("POST /posts", createPostHandler)
-	r.HandleFunc("DELETE /posts/{id}", deletePostHandler)
-	r.HandleFunc("PUT /posts/{id}", updatePostHandler)
+	r.HandleFunc("GET /notes/{id}", getNoteHandler)
+	r.HandleFunc("POST /notes", createNoteHandler)
+	r.HandleFunc("DELETE /notes/{id}", deleteNoteHandler)
+	r.HandleFunc("PUT /notes/{id}", updateNoteHandler)
 
 	http.ListenAndServe("localhost:3000", r)
 }

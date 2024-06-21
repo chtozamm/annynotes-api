@@ -7,10 +7,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type Post struct {
-	ID      int    `json:"id"`
-	Author  string `json:"author"`
-	Message string `json:"message"`
+type Note struct {
+	ID        int    `json:"id"`
+	Author    string `json:"author"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"created_at"`
 }
 
 var db *sql.DB
@@ -32,53 +33,49 @@ func dbDisconnect() error {
 
 // Initialize database
 func dbSetup() error {
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS posts (id INTEGER NOT NULL PRIMARY KEY, author TEXT, message TEXT);`)
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS notes (
+	id INTEGER NOT NULL PRIMARY KEY,
+  author TEXT,
+  message TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);`)
 	if err != nil {
-		log.Panic(err)
+		log.Fatalf("Failed to setup database: %s", err)
 	}
 
 	return nil
 }
 
-func getPosts() ([]Post, error) {
-	var posts []Post
+func getNotes() ([]Note, error) {
+	var notes []Note
 
-	rows, err := db.Query("SELECT id, author, message FROM posts ORDER BY id ASC;")
+	rows, err := db.Query("SELECT id, author, message FROM notes ORDER BY id ASC;")
 	if err != nil {
-		log.Fatalf("Failed to query database for posts: %s", err)
+		log.Fatalf("Failed to query database for notes: %s", err)
 	}
 
 	for rows.Next() {
-		post := Post{}
-		rows.Scan(&post.ID, &post.Author, &post.Message)
-		posts = append(posts, post)
+		note := Note{}
+		rows.Scan(&note.ID, &note.Author, &note.Message)
+		notes = append(notes, note)
 	}
 
-	return posts, nil
+	return notes, nil
 }
 
-func getPost(id string) (Post, error) {
-	post := Post{}
+func getNote(id string) (Note, error) {
+	note := Note{}
 
-	err := db.QueryRow(`SELECT author, message FROM posts WHERE id = ?`, id).Scan(&post.Author, &post.Message)
+	err := db.QueryRow(`SELECT author, message FROM notes WHERE id = ?`, id).Scan(&note.Author, &note.Message)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	return post, nil
+	return note, nil
 }
 
-func createPost(p Post) error {
-	_, err := db.Exec(`INSERT INTO posts (author, message) VALUES (?, ?);`, p.Author, p.Message)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return nil
-}
-
-func deletePost(id string) error {
-	_, err := db.Exec(`DELETE FROM posts WHERE id = ?;`, id)
+func createNote(n Note) error {
+	_, err := db.Exec(`INSERT INTO notes (author, message) VALUES (?, ?);`, n.Author, n.Message)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -86,22 +83,31 @@ func deletePost(id string) error {
 	return nil
 }
 
-func updatePost(id string, p Post) error {
-	post := Post{}
-	err := db.QueryRow(`SELECT author, message FROM posts WHERE id = ?`, id).Scan(&post.Author, &post.Message)
+func deleteNote(id string) error {
+	_, err := db.Exec(`DELETE FROM notes WHERE id = ?;`, id)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	if p.Author != "" {
-		post.Author = p.Author
+	return nil
+}
+
+func updateNote(id string, n Note) error {
+	note := Note{}
+	err := db.QueryRow(`SELECT author, message FROM notes WHERE id = ?`, id).Scan(&note.Author, &note.Message)
+	if err != nil {
+		log.Panic(err)
 	}
 
-	if p.Message != "" {
-		post.Message = p.Message
+	if n.Author != "" {
+		note.Author = n.Author
 	}
 
-	_, err = db.Exec(`UPDATE posts SET author = ?, message = ? WHERE id = ?;`, post.Author, post.Message, id)
+	if n.Message != "" {
+		note.Message = n.Message
+	}
+
+	_, err = db.Exec(`UPDATE notes SET author = ?, message = ? WHERE id = ?;`, note.Author, note.Message, id)
 	if err != nil {
 		log.Panic(err)
 	}

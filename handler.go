@@ -8,72 +8,72 @@ import (
 )
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	posts, _ := getPosts()
+	notes, _ := getNotes()
 
-	data, err := json.Marshal(&posts)
+	data, err := json.Marshal(&notes)
 	if err != nil {
-		log.Fatalf("Failed to marshal posts: %s", err)
+		log.Fatalf("Failed to marshal notes: %s", err)
 	}
 
 	w.Write(data)
 }
 
-func getPostHandler(w http.ResponseWriter, r *http.Request) {
+func getNoteHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	post, err := getPost(id)
+	note, err := getNote(id)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Fatalf("Failed to delete post with id %q: %s", id, err)
+		log.Fatalf("Failed to delete note with id %q: %s", id, err)
 	}
 
-	w.Write([]byte(post.Author + ": " + post.Message))
+	w.Write([]byte(note.Author + ": " + note.Message))
 }
 
-func createPostHandler(w http.ResponseWriter, r *http.Request) {
+func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
-	post := Post{}
+	note := Note{}
 
-	err := json.Unmarshal(body, &post)
+	err := json.Unmarshal(body, &note)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatalf("Failed to unmarshal request body: %s", err)
 	}
 
-	createPost(post)
+	createNote(note)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(post.Author + ": " + post.Message))
+	w.Write([]byte(note.Author + ": " + note.Message))
 }
 
-func deletePostHandler(w http.ResponseWriter, r *http.Request) {
+func deleteNoteHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	err := deletePost(id)
+	err := deleteNote(id)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Fatalf("Failed to delete post with id %q: %s", id, err)
+		log.Fatalf("Failed to delete note with id %q: %s", id, err)
 	}
 }
 
-func updatePostHandler(w http.ResponseWriter, r *http.Request) {
+func updateNoteHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
-	newPost := Post{}
+	newNote := Note{}
 
-	err := json.Unmarshal(body, &newPost)
+	err := json.Unmarshal(body, &newNote)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Fatalf("Failed to unmarshal request body: %s", err)
 	}
 
-	err = updatePost(id, newPost)
+	err = updateNote(id, newNote)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Fatalf("Failed to update post with id %q: %s", id, err)
+		log.Fatalf("Failed to update note with id %q: %s", id, err)
 	}
 }
