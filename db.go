@@ -63,10 +63,27 @@ func getNotes() ([]Note, error) {
 	return notes, nil
 }
 
+func getNotesDesc() ([]Note, error) {
+	var notes []Note
+
+	rows, err := db.Query("SELECT id, author, message FROM notes ORDER BY id DESC;")
+	if err != nil {
+		log.Fatalf("Failed to query database for notes: %s", err)
+	}
+
+	for rows.Next() {
+		note := Note{}
+		rows.Scan(&note.ID, &note.Author, &note.Message)
+		notes = append(notes, note)
+	}
+
+	return notes, nil
+}
+
 func getNote(id string) (Note, error) {
 	note := Note{}
 
-	err := db.QueryRow(`SELECT author, message FROM notes WHERE id = ?`, id).Scan(&note.Author, &note.Message)
+	err := db.QueryRow(`SELECT author, message FROM notes WHERE id = ?;`, id).Scan(&note.Author, &note.Message)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -74,13 +91,25 @@ func getNote(id string) (Note, error) {
 	return note, nil
 }
 
-func createNote(n Note) error {
-	_, err := db.Exec(`INSERT INTO notes (author, message) VALUES (?, ?);`, n.Author, n.Message)
+func getAmountOfNotes() (int, error) {
+	var count int
+
+	err := db.QueryRow("SELECT COUNT(*) FROM notes;").Scan(&count)
+	if err != nil {
+		return 0, nil
+	}
+
+	return count, nil
+}
+
+func createNote(n Note) (Note, error) {
+	note := Note{}
+	err := db.QueryRow(`INSERT INTO notes (author, message) VALUES (?, ?) RETURNING id, author, message;`, n.Author, n.Message).Scan(&note.ID, &note.Author, &note.Message)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	return nil
+	return note, nil
 }
 
 func deleteNote(id string) error {

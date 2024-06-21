@@ -5,10 +5,18 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	notes, _ := getNotes()
+	var notes []Note
+
+	sortQuery := r.URL.Query().Get("sort")
+	if sortQuery == "desc" {
+		notes, _ = getNotesDesc()
+	} else {
+		notes, _ = getNotes()
+	}
 
 	data, err := json.Marshal(&notes)
 	if err != nil {
@@ -30,6 +38,18 @@ func getNoteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(note.Author + ": " + note.Message))
 }
 
+func getCountHandler(w http.ResponseWriter, r *http.Request) {
+	count, err := getAmountOfNotes()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Fatalf("Failed to fetch amount of notes: %s", err)
+	}
+
+	countStr := strconv.Itoa(count)
+
+	w.Write([]byte(countStr))
+}
+
 func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	defer r.Body.Close()
@@ -42,10 +62,19 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Failed to unmarshal request body: %s", err)
 	}
 
-	createNote(note)
+	n, err := createNote(note)
+	if err != nil {
+		log.Fatalf("Failed to create a note: %s", err)
+	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(note.Author + ": " + note.Message))
+	// w.Write([]byte(note.Author + ": " + note.Message))
+	data, err := json.Marshal(&n)
+	if err != nil {
+		log.Fatalf("Failed to marshal notes: %s", err)
+	}
+
+	w.Write(data)
 }
 
 func deleteNoteHandler(w http.ResponseWriter, r *http.Request) {

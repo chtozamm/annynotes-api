@@ -22,6 +22,7 @@ func main() {
 
 	r.HandleFunc("/{$}", homeHandler)
 	r.HandleFunc("GET /notes/{id}", getNoteHandler)
+	r.HandleFunc("GET /notes/count", getCountHandler)
 	r.HandleFunc("POST /notes", createNoteHandler)
 	r.HandleFunc("DELETE /notes/{id}", deleteNoteHandler)
 	r.HandleFunc("PUT /notes/{id}", updateNoteHandler)

@@ -1,0 +1,31 @@
+{{ define "inner_note" }}
+  <li
+    id="note-{{ .Note.ID }}"
+    class="relative mb-8 flex w-full flex-col items-center rounded-2xl border-t-2 border-primary bg-secondary px-4 pb-8 pt-4 text-center leading-6 lg:px-8"
+  >
+    <img
+      src="/static/icons/scroll.svg"
+      class="pointer-events-none absolute left-[calc(50%-12px)] top-[-0.9em] size-[26px] select-none"
+    />
+    <p
+      class="w-full select-text font-ringbearer text-lg font-bold text-primary"
+    >
+      Note
+      #{{ .Note.Idx }}
+    </p>
+    <p class="italic text-zinc-400">from {{ .Note.Author }}</p>
+    <p class="mt-4 w-full whitespace-pre-wrap text-balance break-words">
+      {{- .Note.Message -}}
+    </p>
+  </li>
+{{ end }}
+
+{{ define "note" }}
+  {{ if .NoteCreated }}
+    <ul hx-swap-oob="afterbegin:#notes">
+      {{ template "inner_note" . }}
+    </ul>
+  {{ else }}
+    {{ template "inner_note" . }}
+  {{ end }}
+{{ end }}
