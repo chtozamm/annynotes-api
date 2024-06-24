@@ -66,14 +66,14 @@ func getNotes() ([]Note, error) {
 func getNotesDesc() ([]Note, error) {
 	var notes []Note
 
-	rows, err := db.Query("SELECT id, author, message FROM notes ORDER BY id DESC;")
+	rows, err := db.Query("SELECT * FROM notes ORDER BY id DESC;")
 	if err != nil {
 		log.Fatalf("Failed to query database for notes: %s", err)
 	}
 
 	for rows.Next() {
 		note := Note{}
-		rows.Scan(&note.ID, &note.Author, &note.Message)
+		rows.Scan(&note.ID, &note.Author, &note.Message, &note.CreatedAt)
 		notes = append(notes, note)
 	}
 
@@ -83,7 +83,7 @@ func getNotesDesc() ([]Note, error) {
 func getNote(id string) (Note, error) {
 	note := Note{}
 
-	err := db.QueryRow(`SELECT author, message FROM notes WHERE id = ?;`, id).Scan(&note.Author, &note.Message)
+	err := db.QueryRow(`SELECT * FROM notes WHERE id = ?;`, id).Scan(&note.ID, &note.Author, &note.Message, &note.CreatedAt)
 	if err != nil {
 		log.Panic(err)
 	}

@@ -23,6 +23,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Failed to marshal notes: %s", err)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
 }
 
@@ -35,7 +36,14 @@ func getNoteHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Failed to delete note with id %q: %s", id, err)
 	}
 
-	w.Write([]byte(note.Author + ": " + note.Message))
+	data, err := json.Marshal(&note)
+	if err != nil {
+		log.Fatalf("Failed to marshal note: %s", err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+	// w.Write([]byte(note.Author + ": " + note.Message))
 }
 
 func getCountHandler(w http.ResponseWriter, r *http.Request) {
@@ -67,13 +75,12 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("Failed to create a note: %s", err)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	// w.Write([]byte(note.Author + ": " + note.Message))
 	data, err := json.Marshal(&n)
 	if err != nil {
 		log.Fatalf("Failed to marshal notes: %s", err)
 	}
 
+	w.WriteHeader(http.StatusCreated)
 	w.Write(data)
 }
 

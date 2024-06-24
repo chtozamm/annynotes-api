@@ -27,5 +27,6 @@ func main() {
 	r.HandleFunc("DELETE /notes/{id}", deleteNoteHandler)
 	r.HandleFunc("PUT /notes/{id}", updateNoteHandler)
 
+	log.Println("Server is listening on localhost:3000")
 	http.ListenAndServe("localhost:3000", r)
 }
