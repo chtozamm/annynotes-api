@@ -1,4 +1,4 @@
 /tmp
-
-# Personal markdown files
-TODO.md
+/backup_data
+.env
+*.todo
