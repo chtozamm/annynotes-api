@@ -15,18 +15,16 @@ var jwtKey = []byte(os.Getenv("AUTH_SECRET_KEY"))
 var tokens []string
 
 type Claims struct {
-	UserID   string `json:"user_id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	UserID string `json:"user_id"`
+	Email  string `json:"email"`
 	jwt.RegisteredClaims
 }
 
-func GenerateJWT(id, email, password string) (string, error) {
+func GenerateJWT(id, email string) (string, error) {
 	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &Claims{
-		UserID:   id,
-		Email:    email,
-		Password: password,
+		UserID: id,
+		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
@@ -40,10 +38,10 @@ func ValidateJWT(headers http.Header) (*Claims, error) {
 	bearerToken := headers.Get("Authorization")
 	authHeader := strings.Split(bearerToken, " ")
 	if bearerToken == "" {
-		return nil, errors.New("Authorization token is required")
+		return nil, errors.New("authorization token is required")
 	}
 	if len(authHeader) != 2 {
-		return nil, errors.New(fmt.Sprintf(`Invalid authorization token: expected format "Authorization: Bearer <token>, got: %v`, authHeader))
+		return nil, fmt.Errorf(`invalid authorization token: expected format "Authorization: Bearer <token>, got: %v`, authHeader)
 	}
 	reqToken := authHeader[1]
 
@@ -55,17 +53,17 @@ func ValidateJWT(headers http.Header) (*Claims, error) {
 	if err != nil {
 		switch {
 		case errors.Is(err, jwt.ErrTokenExpired):
-			return nil, errors.New("Token is expired")
+			return nil, errors.New("token is expired")
 		case errors.Is(err, jwt.ErrTokenInvalidClaims):
-			return nil, errors.New("Malformed token: token contains invalid claims")
+			return nil, errors.New("malformed token: token contains invalid claims")
 		case errors.Is(err, jwt.ErrTokenMalformed):
-			return nil, errors.New("Token is malformed")
+			return nil, errors.New("token is malformed")
 		default:
-			return nil, errors.New("Couldn't parse the authorization token")
+			return nil, errors.New("couldn't parse the authorization token")
 		}
 	}
 	if !tkn.Valid {
-		return nil, errors.New("Token is not valid")
+		return nil, errors.New("token is not valid")
 	}
 
 	return claims, nil

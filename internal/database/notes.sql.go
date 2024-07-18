@@ -16,11 +16,11 @@ RETURNING id, author, message, updated_at, created_at, user_id, verified
 `
 
 type CreateNoteParams struct {
-	ID       string      `json:"id"`
-	Author   string      `json:"author"`
-	Message  string      `json:"message"`
-	UserID   interface{} `json:"user_id"`
-	Verified int64       `json:"verified"`
+	ID       string `json:"id"`
+	Author   string `json:"author"`
+	Message  string `json:"message"`
+	UserID   string `json:"user_id"`
+	Verified int64  `json:"verified"`
 }
 
 func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error) {

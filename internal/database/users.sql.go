@@ -10,23 +10,33 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, email, password)
-VALUES (?, ?, ?)
-RETURNING id, email, password, updated_at, created_at, verified
+INSERT INTO users (id, email, name, username, password)
+VALUES (?, ?, ?, ?, ?)
+RETURNING id, email, name, username, password, updated_at, created_at, verified
 `
 
 type CreateUserParams struct {
 	ID       string `json:"id"`
 	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.ID, arg.Email, arg.Password)
+	row := q.db.QueryRowContext(ctx, createUser,
+		arg.ID,
+		arg.Email,
+		arg.Name,
+		arg.Username,
+		arg.Password,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Name,
+		&i.Username,
 		&i.Password,
 		&i.UpdatedAt,
 		&i.CreatedAt,
@@ -35,36 +45,22 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password, updated_at, created_at, verified FROM users WHERE id = ?
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, email, name, username, password, updated_at, created_at, verified FROM users WHERE email = ?
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, id)
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Name,
+		&i.Username,
 		&i.Password,
 		&i.UpdatedAt,
 		&i.CreatedAt,
 		&i.Verified,
 	)
 	return i, err
-}
-
-const getUserIDByCredentials = `-- name: GetUserIDByCredentials :one
-SELECT id FROM users WHERE email = ? AND password = ?
-`
-
-type GetUserIDByCredentialsParams struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-func (q *Queries) GetUserIDByCredentials(ctx context.Context, arg GetUserIDByCredentialsParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, getUserIDByCredentials, arg.Email, arg.Password)
-	var id string
-	err := row.Scan(&id)
-	return id, err
 }

@@ -1,6 +1,14 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT NOT NULL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL CHECK(
+    length(name) >= 2 AND
+    length(name) <= 20
+  ),
+  username TEXT NOT NULL UNIQUE CHECK(
+    length(username) >= 2 AND
+    length(username) <= 20
+  ),
   password TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),

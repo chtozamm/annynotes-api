@@ -1,11 +1,11 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 )
@@ -21,14 +21,21 @@ func (mr *malformedRequest) Error() string {
 
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) error {
 
-	// Check if Content-Type header is present
-	ct := r.Header.Get("Content-Type")
-	if ct != "" {
-		mediaType := strings.ToLower(strings.TrimSpace(strings.Split(ct, ";")[0])) // normalize header by stripping whitespace and any additional parameters
-		if mediaType != "application/json" {
-			msg := "Content-Type header is not application/json"
+	// Check if Content-Type header is present and set to "application/json"
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "" {
+		mt, _, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			msg := "Malformed Content-Type header"
+			return &malformedRequest{status: http.StatusBadRequest, msg: msg}
+		}
+		if mt != "application/json" {
+			msg := "Content-Type header must be application/json"
 			return &malformedRequest{status: http.StatusUnsupportedMediaType, msg: msg}
 		}
+	} else {
+		msg := "Content-Type header must be provided"
+		return &malformedRequest{status: http.StatusBadRequest, msg: msg}
 	}
 
 	// Restrict request body size
@@ -101,50 +108,5 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) err
 		return &malformedRequest{status: http.StatusBadRequest, msg: msg}
 	}
 
-	return nil
-}
-
-func setupDB(conn *sql.DB) error {
-	_, err := conn.Exec(`
-CREATE TABLE IF NOT EXISTS notes (
-  id TEXT NOT NULL PRIMARY KEY,
-  author TEXT NOT NULL,
-  message TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
-  user_id TEXT NOT NULL DEFAULT "mmq9tll8as33g64",
-  verified INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TRIGGER IF NOT EXISTS update_note_timestamp
-AFTER UPDATE ON notes
-FOR EACH ROW
-BEGIN
-  UPDATE notes
-  SET updated_at = strftime('%Y-%m-%d %H:%M:%fZ', 'now')
-  WHERE id = NEW.id;
-END;
-
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT NOT NULL PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  password TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
-  verified INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TRIGGER IF NOT EXISTS update_user_timestamp
-AFTER UPDATE ON users
-FOR EACH ROW
-BEGIN
-  UPDATE users
-  SET updated_at = strftime('%Y-%m-%d %H:%M:%fZ', 'now')
-  WHERE id = NEW.id;
-END;
-`)
-	if err != nil {
-		return err
-	}
 	return nil
 }

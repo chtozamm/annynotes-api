@@ -1,12 +1,15 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
+	"syscall"
+	"time"
 
 	"github.com/chtozamm/annynotes-go/internal/database"
 	"github.com/chtozamm/annynotes-go/internal/utils"
@@ -15,7 +18,8 @@ import (
 
 // The core of the application
 type application struct {
-	DB *database.Queries
+	DB  *database.Queries
+	srv *http.Server
 }
 
 func main() {
@@ -36,32 +40,50 @@ func main() {
 	} else {
 		localDataPath = os.Getenv("XDG_DATA_HOME")
 	}
-	// Open database file or create a new one if doesn't exist
-	connection, err := sql.Open("sqlite3", path.Join(localDataPath, "annynotes", "annynotes.db"))
-	if err != nil {
-		log.Fatalf("Failed to connect to the database: %s", err)
-	}
-	// Setup database tables
-	err = setupDB(connection)
-	if err != nil {
-		log.Fatalf("Failed to setup the database: %s", err)
-	}
 
-	app := application{
-		DB: database.New(connection),
+	// Database
+	connection, err := dbConnect(path.Join(localDataPath, "annynotes", "annynotes.db"))
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer connection.Close()
 
 	r := http.NewServeMux()
 
-	r.HandleFunc("/{$}", app.homeHandler)
-	r.HandleFunc("GET /notes/{id}", app.getNoteHandler)
+	app := application{
+		DB: database.New(connection),
+		srv: &http.Server{
+			Addr:    port,
+			Handler: r,
+		},
+	}
+
+	// Router
+	r.HandleFunc("GET /notes", app.getNotesHandler)
 	r.HandleFunc("POST /notes", app.withAuth(app.createNoteHandler))
-	r.HandleFunc("PUT /notes/{id}", app.withAuth(app.updateNoteHandler))
-	r.HandleFunc("DELETE /notes/{id}", app.withAuth(app.deleteNoteHandler))
-	r.HandleFunc("GET /{author}", app.getNotesFromAuthorHandler)
+	r.HandleFunc("GET /note/{id}", app.getNoteHandler)
+	r.HandleFunc("PATCH /note/{id}", app.withAuth(app.updateNoteHandler))
+	r.HandleFunc("DELETE /note/{id}", app.withAuth(app.deleteNoteHandler))
+	r.HandleFunc("GET /notes/{author}", app.getNotesFromAuthorHandler)
 	r.HandleFunc("POST /users", app.createUserHandler)
 	r.HandleFunc("POST /users/auth", app.authenticateUserHandler)
 
-	log.Print("Server is listening on localhost:", port)
-	http.ListenAndServe("localhost:"+port, r)
+	// Gracefully shut down by handling existing requests in the given time
+	go func() {
+		log.Print("Server is listening on localhost:", port)
+		http.ListenAndServe(":"+port, r)
+	}()
+	// Create a channel to listen for shutdown signals
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	// Block until a signal is received
+	<-quit
+	// Create a context with a timeout for the shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Attempt to gracefully shutdown the server
+	if err := app.srv.Shutdown(ctx); err != nil {
+		log.Printf("Server forced to shutdown: %s", err)
+	}
+	log.Println("Server closed")
 }

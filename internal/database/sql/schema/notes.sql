@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS notes (
   message TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ', 'now')),
-  user_id TEXT NOT NULL DEFAULT "mmq9tll8as33g64",
+  user_id TEXT NOT NULL,
   verified INTEGER NOT NULL DEFAULT 0
 );
 

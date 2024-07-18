@@ -1,10 +1,7 @@
 -- name: CreateUser :one
-INSERT INTO users (id, email, password)
-VALUES (?, ?, ?)
+INSERT INTO users (id, email, name, username, password)
+VALUES (?, ?, ?, ?, ?)
 RETURNING *;
 
--- name: GetUserByID :one
-SELECT * FROM users WHERE id = ?;
-
--- name: GetUserIDByCredentials :one
-SELECT id FROM users WHERE email = ? AND password = ?;
+-- name: GetUserByEmail :one
+SELECT * FROM users WHERE email = ?;

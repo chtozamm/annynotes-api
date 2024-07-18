@@ -18,7 +18,7 @@ func (app *application) withAuth(handler authedHandler) http.HandlerFunc {
 			return
 		}
 
-		user, err := app.DB.GetUserByID(r.Context(), claims.UserID)
+		user, err := app.DB.GetUserByEmail(r.Context(), claims.Email)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
@@ -28,7 +28,10 @@ func (app *application) withAuth(handler authedHandler) http.HandlerFunc {
 	}
 }
 
-// TODO: add logger middleware
-
-// func (app *application) logger(handler http.Handler) http.HandlerFunc {
+// func (app *application) logger(handler http.HandlerFunc) http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		// logger.Logger.Info(r.Method, r.URL.Path, r.Header.Get("Referer"), r.RemoteAddr, r.Header.Get(""))
+// 		log.Println(r.Method, r.URL.Path, r.Header.Get("Referer"), r.RemoteAddr, r.Header.Get(""))
+// 		handler(w, r)
+// 	}
 // }

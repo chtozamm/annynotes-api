@@ -1,10 +1,12 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
+	"net/mail"
 	"strings"
 
 	"github.com/chtozamm/annynotes-go/internal/auth"
@@ -13,7 +15,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-func (app *application) homeHandler(w http.ResponseWriter, r *http.Request) {
+func (app *application) getNotesHandler(w http.ResponseWriter, r *http.Request) {
 	var notes []database.Note
 	var err error
 
@@ -32,17 +34,18 @@ func (app *application) homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle no content response
 	if len(notes) == 0 {
 		w.WriteHeader(http.StatusNoContent)
-		// w.Header().Set("Content-Type", "application/json")
-		// w.Write([]byte(`{"notes": []}`))
 		return
 	}
 
 	payload, err := json.Marshal(&struct {
+		Total int             `json:"total"`
 		Notes []database.Note `json:"notes"`
-	}{Notes: notes})
+	}{
+		Total: len(notes),
+		Notes: notes,
+	})
 	if err != nil {
 		log.Printf("Failed to marshal notes: %s", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -59,6 +62,7 @@ func (app *application) getNotesFromAuthorHandler(w http.ResponseWriter, r *http
 		msg := "Author was not provided"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	// Normalize author name
@@ -98,7 +102,13 @@ func (app *application) getNotesFromAuthorHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	payload, err := json.Marshal(&notes)
+	payload, err := json.Marshal(&struct {
+		Total int             `json:"total"`
+		Notes []database.Note `json:"notes"`
+	}{
+		Total: len(notes),
+		Notes: notes,
+	})
 	if err != nil {
 		log.Printf("Failed to marshal notes: %s", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -116,12 +126,7 @@ func (app *application) getNoteHandler(w http.ResponseWriter, r *http.Request) {
 		msg := "Note ID was not provided"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
-	}
-
-	if !utils.ValidateId(id) {
-		msg := "Invalid note ID"
-		log.Printf(msg)
-		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	note, err := app.DB.FetchNoteByID(r.Context(), id)
@@ -165,14 +170,17 @@ func (app *application) createNoteHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if note.ID == "" {
-		note.ID = utils.GenerateUniqueId()
+	if note.Author == "" {
+		note.Author = "stranger"
 	}
+
+	note.ID = utils.GenerateUniqueId()
 
 	if !utils.ValidateId(note.ID) {
 		msg := "Invalid note ID"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	newNote, err := app.DB.CreateNote(r.Context(), database.CreateNoteParams{
@@ -207,12 +215,14 @@ func (app *application) deleteNoteHandler(w http.ResponseWriter, r *http.Request
 		msg := "Note ID was not provided"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	if !utils.ValidateId(id) {
 		msg := "Invalid note ID"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	note, err := app.DB.FetchNoteByID(r.Context(), id)
@@ -223,7 +233,7 @@ func (app *application) deleteNoteHandler(w http.ResponseWriter, r *http.Request
 	}
 	if note.UserID != user.ID {
 		log.Printf("Unauthorized attempt to delete a note %q by user %q", note.ID, user.ID)
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		http.Error(w, "Note belongs to another user", http.StatusUnauthorized)
 		return
 	}
 
@@ -231,6 +241,7 @@ func (app *application) deleteNoteHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		log.Printf("Failed to delete a note with the ID %q: %s", id, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	log.Printf("Delete a note with the ID %q", id)
@@ -244,12 +255,14 @@ func (app *application) updateNoteHandler(w http.ResponseWriter, r *http.Request
 		msg := "Note ID was not provided"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	if !utils.ValidateId(id) {
 		msg := "Invalid note ID"
 		log.Printf(msg)
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
 	note, err := app.DB.FetchNoteByID(r.Context(), id)
@@ -260,7 +273,7 @@ func (app *application) updateNoteHandler(w http.ResponseWriter, r *http.Request
 	}
 	if note.UserID != user.ID {
 		log.Printf("Unauthorized attempt to update a note %q by user %q", note.ID, user.ID)
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		http.Error(w, "Note belongs to another user", http.StatusUnauthorized)
 		return
 	}
 
@@ -278,6 +291,17 @@ func (app *application) updateNoteHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if newNote.Message == "" {
+		msg := "Message field cannot be empty"
+		log.Print("Tried to update a note without a message")
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	if newNote.Author == "" {
+		newNote.Author = note.Author
+	}
+
 	updatedNote, err := app.DB.UpdateNote(r.Context(), database.UpdateNoteParams{
 		ID:      id,
 		Author:  newNote.Author,
@@ -286,6 +310,7 @@ func (app *application) updateNoteHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		log.Printf("Failed to update a note with the ID %q: %s", id, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 	log.Printf("Update a note with the ID %q", id)
 
@@ -316,27 +341,75 @@ func (app *application) createUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if user.ID == "" {
-		user.ID = utils.GenerateUniqueId()
+	user.ID = utils.GenerateUniqueId()
+
+	switch {
+	case user.Email == "":
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	case user.Password == "":
+		http.Error(w, "Password is required", http.StatusBadRequest)
+		return
+	case user.Username == "":
+		http.Error(w, "Username is required", http.StatusBadRequest)
+		return
+	case user.Name == "":
+		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
 	}
 
-	if !utils.ValidateId(user.ID) {
-		msg := "Invalid note ID"
-		log.Printf(msg)
-		http.Error(w, msg, http.StatusBadRequest)
+	if len(user.Password) < 4 {
+		log.Print("Provided password is too short")
+		http.Error(w, "Password must contain at least 4 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := auth.HashPassword(user.Password)
+	if err != nil {
+		log.Printf("Failed to hash password: %s", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	// Validate email
+	email, err := mail.ParseAddress(user.Email)
+	if err != nil {
+		log.Printf("Failed to parse an email: %s", err)
+		http.Error(w, "Email is not valid", http.StatusBadRequest)
+		return
 	}
 
 	newUser, err := app.DB.CreateUser(r.Context(), database.CreateUserParams{
 		ID:       user.ID,
-		Email:    user.Email,
-		Password: user.Password,
+		Email:    email.Address,
+		Name:     user.Name,
+		Username: user.Username,
+		Password: hashedPassword,
 	})
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) {
-			if sqliteErr.Code == sqlite3.ErrConstraint {
+			log.Print(sqliteErr.Code)
+			log.Print(sqliteErr.Error())
+			switch sqliteErr.ExtendedCode {
+			case sqlite3.ErrConstraintUnique:
 				log.Printf("Attempt to create a new user with email that already exists: %s", err)
 				http.Error(w, "Email is already in use", http.StatusConflict)
+				return
+			case sqlite3.ErrConstraintCheck:
+				if strings.Contains(sqliteErr.Error(), "length(username)") {
+					http.Error(w, "Username must be between 2 and 20 characters long", http.StatusBadRequest)
+					return
+				}
+				if strings.Contains(sqliteErr.Error(), "length(name)") {
+					http.Error(w, "Name must be between 2 and 20 characters long", http.StatusBadRequest)
+					return
+				}
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			default:
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 				return
 			}
 		}
@@ -345,26 +418,8 @@ func (app *application) createUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	token, err := auth.GenerateJWT(newUser.ID, newUser.Email, newUser.Password)
-	if err != nil {
-		log.Printf("Failed to generate JWT: %s", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	payload, err := json.Marshal(&struct {
-		Token string `json:"token"`
-	}{Token: token})
-	if err != nil {
-		log.Printf("Failed to marshal token: %s", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
 	log.Printf("New user created with the ID %q", user.ID)
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(payload)
+	auth.RespondWithJWT(w, newUser.ID, newUser.Email)
 }
 
 func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -390,33 +445,25 @@ func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	id, err := app.DB.GetUserIDByCredentials(r.Context(), database.GetUserIDByCredentialsParams{
-		Email:    user.Email,
-		Password: user.Password,
-	})
+	storedUser, err := app.DB.GetUserByEmail(r.Context(), user.Email)
 	if err != nil {
+		// Send 404 if user doesn't exist
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "User does not exist", http.StatusNotFound)
+			return
+		}
+		// Send 500 for any other errors
 		log.Printf("User authentication fail: %s", err)
-		http.Error(w, "Wrong email or password", http.StatusNotFound)
-		return
-	}
-	user.ID = id
-
-	token, err := auth.GenerateJWT(user.ID, user.Email, user.Password)
-	if err != nil {
-		log.Printf("Failed to generate JWT: %s", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-	payload, err := json.Marshal(&struct {
-		Token string `json:"token"`
-	}{Token: token})
-	if err != nil {
-		log.Printf("Failed to marshal token: %s", err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	// Check password against the hash
+	if !auth.CheckPassword(storedUser.Password, user.Password) {
+		log.Print("Attempt to login with incorrect password")
+		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(payload)
+	auth.RespondWithJWT(w, storedUser.ID, storedUser.Email)
 }

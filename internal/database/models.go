@@ -5,18 +5,20 @@
 package database
 
 type Note struct {
-	ID        string      `json:"id"`
-	Author    string      `json:"author"`
-	Message   string      `json:"message"`
-	UpdatedAt string      `json:"updated_at"`
-	CreatedAt string      `json:"created_at"`
-	UserID    interface{} `json:"user_id"`
-	Verified  int64       `json:"verified"`
+	ID        string `json:"id"`
+	Author    string `json:"author"`
+	Message   string `json:"message"`
+	UpdatedAt string `json:"updated_at"`
+	CreatedAt string `json:"created_at"`
+	UserID    string `json:"user_id"`
+	Verified  int64  `json:"verified"`
 }
 
 type User struct {
 	ID        string `json:"id"`
 	Email     string `json:"email"`
+	Name      string `json:"name"`
+	Username  string `json:"username"`
 	Password  string `json:"password"`
 	UpdatedAt string `json:"updated_at"`
 	CreatedAt string `json:"created_at"`
